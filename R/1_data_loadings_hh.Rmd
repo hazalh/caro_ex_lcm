@@ -126,7 +126,6 @@ usethis::use_data(metadata_cleaned, overwrite = T)
 #NA filter whole matrix and normalize
 raw data matrix is saved as Rda file. Similarly, data is saved separately after NA filtering.
 ```{r}
-###########filter
 df_70f <- selectOverallPercent(df_cleaned, 0.7) #1784 proteins << original df was 2318
 
 df_70f_qn <- normalizeQuantiles(df_70f)
@@ -240,8 +239,38 @@ Here; all NAs are omitted, resulting **810 proteins** in total. Afterwards, data
 
 ***PCA shows a region-specific clustering*** There is no clustering based on intervention, duration of intervention, MS sampleprep date, cryostat date, lcm date or duration of freezing. 
 ```{r}
+
+principal_component_analysis <-
+  function(.data, our_variable) {
+    data_pca <- t(.data) |>
+      as.matrix()
+    pca_object <- stats::prcomp(data_pca, scale = T)
+    data_pca <- pca_object$x
+    data_pca <- as.data.frame(data_pca)
+    data_pca <- data_pca |>
+      dplyr::select(PC1, PC2) |>
+      tibble::add_column(our_variable = our_variable)
+    pca_plot <- ggplot(data_pca,
+                       aes(
+                         x = PC1,
+                         y = PC2,
+                         color = our_variable,
+                         names = sample_id
+                       )) +
+      geom_point() +
+      labs(colour = deparse(substitute(our_variable)))+
+      theme_minimal() +
+      theme(plot.title = element_text(size = 16, face = "bold")) +
+      theme(plot.title = element_text(hjust = 0.5)) +
+      theme(legend.title = element_text(size = 12, face = "bold")) +
+      scale_color_viridis_d()
+    return(plotly::ggplotly(pca_plot))
+  }
+
+
+
 df_50f <- selectOverallPercent(df, 0.5)
-df_nona <- na.omit(df_50f) #810 proteins
+df_nona <- na.omit(df) #705 proteins
 df_nona_qn <- normalizeQuantiles(df_nona)
 
 pca_nona <- prcomp(t(df_nona_qn), scale = T)
@@ -249,6 +278,8 @@ pca_nona <- prcomp(t(df_nona_qn), scale = T)
 summary(pca_nona)
 
 fviz_pca_ind(pca_nona) #quick view 
+
+principal_component_analysis(df_nona_qn)
 
 pca_var <- pca_nona$sdev^2
 pca_var_perc <- round(pca_var/sum(pca_var)*100, digits = 1) #percentage of each component
@@ -366,18 +397,21 @@ ggsave(file = "doc/caro_ex_lcm_spect_1sampleremoved_70f_matrix_qn_nona_PCA_bydur
 ## Region specific visualization 
 ### MTJ 
 ```{r}
+#df <- selectGrps(df_cleaned, metadata_cleaned$tissue, 0.5, n=1)
+#if you first filter the data (whole matrix or in 1 group), you will end up having the same IDs. but if you divide the data to each region and then filter for 50%, we could then see unique IDs.
+
 mtj <- metadata_cleaned %>% filter(metadata_cleaned$tissue == "MTJ")
-df_mtj <- df[ , trimws(mtj$sample_id)]
+df_mtj <- df_cleaned[ , trimws(mtj$sample_id)]
+
+df_mtj_nona <- na.omit(df_mtj)
 
 df_mtj50 <- selectOverallPercent(df_mtj, 0.5)
-
 df_mtj50$median <- rowMedians(as.matrix(df_mtj50), na.rm = T)
-
 df_mtj50 <- df_mtj50 %>% arrange(desc(median))
 df_mtj50$rank = (1:2121) 
 df_mtj50$protein <- row.names(df_mtj50)
 
-ggplot(df_mtj, aes(rank, median)) + 
+ggplot(df_mtj50, aes(rank, median)) + 
   geom_line() +
     labs(title = "S-curve_allsamples_MTJ") + 
     ylab("Log10 protein intensities (median)") + 
@@ -385,10 +419,10 @@ ggplot(df_mtj, aes(rank, median)) +
     theme_minimal()
 
 muscle <- metadata_cleaned %>% filter(metadata_cleaned$tissue == "Muscle")
-df_muscle <- df[ , trimws(muscle$sample_id)]
+df_muscle <- df_cleaned[ , trimws(muscle$sample_id)]
+df_muscle_nona <- na.omit(df_muscle)
 
 df_muscle50 <- selectOverallPercent(df_muscle, 0.5)
-
 df_muscle50$median <- rowMedians(as.matrix(df_muscle50), na.rm = T)
 df_muscle50 <- df_muscle50 %>% arrange(desc(median))
 df_muscle50$rank = (1:1826) 
@@ -403,22 +437,56 @@ ggplot(df_muscle50, aes(rank, median)) +
 
 
 tendon <- metadata_cleaned %>% filter(metadata_cleaned$tissue == "Tendon")
-df_tendon <- df[ , trimws(tendon$sample_id)]
+df_tendon <- df_cleaned[ , trimws(tendon$sample_id)]
+df_tendon_nona <- na.omit(df_tendon)
 
 df_tendon50 <- selectOverallPercent(df_tendon, 0.5)
-
 df_tendon50$median <- rowMedians(as.matrix(df_tendon50), na.rm = T)
 df_tendon50 <- df_tendon50 %>% arrange(desc(median))
 df_tendon50$rank = (1:2015) 
 df_tendon50$protein <- row.names(df_tendon50)
 
-ggplot(df_tendon, aes(rank, median)) + 
+ggplot(df_tendon50, aes(rank, median)) + 
   geom_line() +
     labs(title = "S-curve_allsamples_tendon") + 
     ylab("Log10 protein intensities (median)") + 
     xlab("Abundance rank") + 
     theme_minimal()
 
+###########################
+#Venn diagram showing overlap between regions_filtered for no NA
+overlap_nona <- list(MTJ = rownames(df_mtj_nona), 
+                Tendon = rownames(df_tendon_nona),
+                Muscle = rownames(df_muscle_nona))
+
+ggVennDiagram(overlap_nona, label = "count", label_alpha = 0.8, set_size = 3) + 
+    labs(title = "nona_ineachregion")
+
+
+overlap_50f <- list(MTJ = df_mtj50$protein, 
+                Tendon = df_tendon50$protein,
+                Muscle = df_muscle50$protein)
+
+ggVennDiagram(overlap_50f, label = "count", label_alpha = 0.8, set_size = 3) + 
+    labs(title = "50f_ineachregion")
+
+
+#common proteins
+common_mtj_tendon <- intersect(df_mtj50$protein, df_tendon50$protein)
+common_mtj_muscle <- intersect(df_mtj50$protein, df_muscle50$protein)
+common_muscle_tendon <- intersect(df_tendon50$protein, df_muscle50$protein)
+
+#exclusive in mtj 
+exclusive_mtj <- setdiff(df_mtj50$protein, common_mtj_tendon)
+exclusive_mtj <- setdiff(exclusive_mtj, common_mtj_muscle)
+
+#exclusive in muscle 
+exclusive_muscle <- setdiff(df_muscle50$protein, common_mtj_muscle)
+exclusive_muscle <- setdiff(exclusive_muscle, common_muscle_tendon)
+
+#exclusive in tendon 
+exclusive_tendon <- setdiff(df_tendon50$protein, common_mtj_tendon)
+exclusive_tendon <- setdiff(exclusive_tendon, common_muscle_tendon)
 ###########################
 # MDS plot 
 mds_mtj_70f_qn <- plotMDS(mtj_70f_qn)
