@@ -65,6 +65,122 @@ usethis::use_data(df, overwrite = T)
 write.csv(df, file = "data/caro_ex_lcm_spect_allsamples_sorted.csv", row.names = T, quote = F)
 ```
 
+# muscle only 
+1798 proteins 
+```{r}
+df_muscle <- read.delim("data-raw/20240225_194041_Caro-LCM-onlymuscle_proteinquant_Report.tsv", header = T, check.names = T, sep = "\t") %>%
+        dplyr::select("PG.ProteinGroups", "PG.Genes", 5:40) 
+
+new_colnames <- sapply(strsplit(colnames(df_muscle), "_"), '[',10)
+colnames(df_muscle) <- new_colnames
+
+colnames(df_muscle)[1] <- "protein_groups"
+colnames(df_muscle)[2] <- "genes"
+colnames(df_muscle)[33] <- "S109"
+
+df_muscle <- df_muscle %>%
+    mutate(genes = if_else(genes == "", protein_groups, genes)) %>%
+    mutate_at(3:38, as.numeric) %>%
+    mutate_all(~ifelse(is.nan(.), NA, .)) %>%
+    mutate(genes = make.names(genes, unique = T), genes) %>% 
+    column_to_rownames(var = "genes") %>% 
+    dplyr::select(-c("protein_groups")) %>%
+    log2()
+
+names(df_muscle) <- sub("^S", "", names(df_muscle))
+
+#############
+# metadata, sample order 
+metadata <- read.csv2("data-raw/MetaData_10Jan.csv", header = T, sep = ';') %>% 
+    dplyr::select(1:15) %>%
+    mutate_at(1:15, as.factor) %>% 
+    arrange(intervention)
+
+metadata_muscle <- metadata[metadata$tissue == "Muscle", ]
+
+sample_order <- metadata_muscle$sample_id[order(metadata_muscle$intervention)]
+sample_order <- trimws(sample_order) 
+df_muscle <- df_muscle[ ,sample_order]
+
+###############
+# data vis
+vis_miss(df_muscle, sort_miss = T)
+plotDensities(df_muscle, main = "caro_ex_lcm_onlymuscle_log2")
+boxplot(df_muscle, main = "caro_ex_lcm_onlymuscle_log2")
+
+df_muscle_cleaned <- df_muscle %>% dplyr::select(-"19")
+plotDensities(df_muscle_cleaned, main = "caro_ex_lcm_onlymuscle_log2_cleaned")
+boxplot(df_muscle_cleaned, main = "caro_ex_lcm_onlymuscle_log2_cleaned")
+
+metadata_muscle <- metadata_muscle %>% filter(sample_id != "19" )
+
+################
+# 50% filter > most abundant proteins 
+
+df_muscle_cleaned50 <- selectOverallPercent(df_muscle_cleaned, 0.5)
+df_muscle_cleaned50$median <- rowMedians(as.matrix(df_muscle_cleaned50), na.rm = T)
+df_muscle_cleaned50 <- df_muscle_cleaned50 %>% arrange(desc(median))
+df_muscle_cleaned50$rank = (1:1667) 
+df_muscle_cleaned50$protein <- row.names(df_muscle_cleaned50)
+
+
+################
+# 50% filter > proteins from the literature 
+known_mtj_prot <- c("Xirp2", "Thbs4", "Ncam1", "Col22a1", "Fermt2", "Cd151", "Cilp", "Itga10", "Ogn", "Fmod", "Bgn", "Col1a2", "Col6a3", "Col6a2", "Col1a1", "Col6a1", "Col12a1", "Prelp", "Lam2", "Vdaxc1", "Vdac2", "Vdac3", "Mpz", "Vcl", "Plec", "Des", "Dsp", "Actn" , "Capz", "Flnc", "Fhl1", "Ttn", "Pdlim7", "Myot")
+
+poi_indata <- df_muscle_cleaned[row.names(df_muscle_cleaned) %in% known_mtj_prot, ]
+
+poi_indata_long <- poi_indata %>% 
+    tibble::rownames_to_column("genes") %>% 
+    tidyr::pivot_longer(
+        cols = !genes,
+        values_to = "intensities",
+        names_to = "sample_id"
+    ) %>% 
+    dplyr::inner_join(metadata_muscle) %>% 
+    dplyr::select(genes, sample_id, intensities, tissue, intervention)
+
+head(poi_indata_long)
+
+ggplot(poi_indata_long, aes(x = tissue, y = intensities)) + 
+  geom_violin(trim = FALSE) +  # Set trim to FALSE to display the entire violin plot
+  geom_point(position = position_jitter(width = 0.2), size = 1.5, alpha = 0.5) +
+  stat_summary(fun = median, geom = "crossbar", width = 0.5, color = "black") +
+  labs(x = "Tissue", y = "log2 protein intensities", title = "known_mtj_proteins_onlymuscledata") +
+  theme_minimal() + 
+  facet_wrap(~ genes, scales = "free")
+
+
+################
+known_tendon_prot <- c("Serpina1", "Dcn", "Fbn1", 
+"Fn1", "Col1a1", "Col1a2", "Col3a1", "Col4a1", "Col5a1", "Col5a2", 
+"Col6a1", "Col6a2", "Col6a3", "Col11a1", "Col11a2", "Col2a1", "Col12a1", "Comp")
+
+poi_indata <- df_muscle_cleaned[row.names(df_muscle_cleaned) %in% known_tendon_prot, ]
+
+poi_indata_long <- poi_indata %>% 
+    tibble::rownames_to_column("genes") %>% 
+    tidyr::pivot_longer(
+        cols = !genes,
+        values_to = "intensities",
+        names_to = "sample_id"
+    ) %>% 
+    dplyr::inner_join(metadata_muscle) %>% 
+    dplyr::select(genes, sample_id, intensities, tissue, intervention)
+
+head(poi_indata_long)
+
+ggplot(poi_indata_long, aes(x = tissue, y = intensities)) + 
+  geom_violin(trim = FALSE) +  # Set trim to FALSE to display the entire violin plot
+  geom_point(position = position_jitter(width = 0.2), size = 2, alpha = 0.5) +
+  stat_summary(fun = median, geom = "crossbar", width = 0.5, color = "black") +
+  labs(x = "Tissue", y = "log2 protein intensities", title = "known_tendon_proteins_onlymuscledata") +
+  theme_minimal() + 
+  facet_wrap(~ genes, scales = "free")
+
+
+```
+
 # summary reports
 ```{r}
 summary(df)
