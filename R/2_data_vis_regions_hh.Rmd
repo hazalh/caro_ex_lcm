@@ -24,30 +24,15 @@ df_mtj50 <- df_mtj50 %>% arrange(desc(median))
 df_mtj50$rank = (1:2121) 
 df_mtj50$protein <- row.names(df_mtj50)
 
-ggplot(df_mtj50, aes(rank, median)) + 
-  geom_line() +
-    labs(title = "S-curve_allsamples_MTJ") + 
-    ylab("Log10 protein intensities (median)") + 
-    xlab("Abundance rank") + 
-    theme_minimal()
-
 ################
 muscle <- metadata_cleaned %>% filter(metadata_cleaned$tissue == "Muscle")
 df_muscle <- df_cleaned[ , trimws(muscle$sample_id)]
-
 
 df_muscle50 <- selectOverallPercent(df_muscle, 0.5)
 df_muscle50$median <- rowMedians(as.matrix(df_muscle50), na.rm = T)
 df_muscle50 <- df_muscle50 %>% arrange(desc(median))
 df_muscle50$rank = (1:1826) 
 df_muscle50$protein <- row.names(df_muscle50)
-
-ggplot(df_muscle50, aes(rank, median)) + 
-  geom_line() +
-    labs(title = "S-curve_allsamples_muscle") + 
-    ylab("Log10 protein intensities (median)") + 
-    xlab("Abundance rank") + 
-    theme_minimal()
 
 ###############
 tendon <- metadata_cleaned %>% filter(metadata_cleaned$tissue == "Tendon")
@@ -58,13 +43,6 @@ df_tendon50$median <- rowMedians(as.matrix(df_tendon50), na.rm = T)
 df_tendon50 <- df_tendon50 %>% arrange(desc(median))
 df_tendon50$rank = (1:2015) 
 df_tendon50$protein <- row.names(df_tendon50)
-
-ggplot(df_tendon50, aes(rank, median)) + 
-  geom_line() +
-    labs(title = "S-curve_allsamples_tendon") + 
-    ylab("Log10 protein intensities (median)") + 
-    xlab("Abundance rank") + 
-    theme_minimal()
 
 ###########################
 #Venn diagram showing overlap between regions_filtered for 50% 
@@ -106,18 +84,70 @@ exclusive_tendon <- setdiff(exclusive_tendon, common_muscle_tendon)
 #    labs(title = "nona_ineachregion")
 ```
 
+# Scurve 
+```{r}
+# MTJ 
+ggplot(df_mtj50, aes(rank, median)) + 
+  geom_line() +
+    geom_point(data = top_bottom, aes(color = "red"), size = 2) + 
+  geom_text(data = top_bottom, aes(label = row.names(top_bottom)), vjust = 0.5, hjust = -0.5, size = 2.3) + 
+    labs(title = "S-curve_allsamples_MTJ") + 
+    ylab("Log2 protein intensities (median)") + 
+    xlab("Abundance rank") + 
+    theme_minimal()
+
+mtj_top <- rownames(df_mtj50[1:10,])
+
+
+
+# Muscle 
+ggplot(df_muscle50, aes(rank, median)) + 
+  geom_line() +
+    labs(title = "S-curve_allsamples_muscle") + 
+    ylab("Log2 protein intensities (median)") + 
+    xlab("Abundance rank") + 
+    
+    theme_minimal()
+
+# Tendon
+ggplot(df_tendon50, aes(rank, median)) + 
+  geom_line() +
+    labs(title = "S-curve_allsamples_tendon") + 
+    ylab("Log2 protein intensities (median)") + 
+    xlab("Abundance rank") + 
+    theme_minimal()
+
+
+top_bottom <- c("H4c1", "Tuba1a", "Calm1.Calm2.Calm3", "Coq6", 
+                "Camk2b", "Actc1", "Akt2","Pcdh18", "Cnot6", "Nrsn2")
+
+top_bottom <- df_scurve[row.names(df_scurve) %in% top_bottom, ]
+
+
+ggplot(df_scurve, aes(rank, median)) + 
+  geom_line() +
+  geom_point(data = top_bottom, aes(color = "red"), size = 2) + 
+  geom_text(data = top_bottom, aes(label = row.names(top_bottom)), vjust = 0.5, hjust = -0.5, size = 2.3) + 
+  labs(title = "S-curve_allsamples_6417_median") + 
+  ylab("Log10 protein intensities (median)") + 
+  xlab("Abundance rank") + 
+  theme_minimal()
+```
+
+
+
+
 # proteins from literature
 ```{r}
-# remove sample_ids that we are not so sure if they match the tissue 
-df_cleaned <- df_cleaned %>% dplyr::select(-"19", -"53", -"38", -"94", -"109")
+# remove sample_ids that we are not so sure if they match the right tissue in PCA 
+df_cleaned <- df_cleaned %>% dplyr::select(-"19", -"53", -"38")
 
 metadata_cleaned <- metadata_cleaned %>%  filter(sample_id != "19", 
                                                  sample_id != "53", 
-                                                 sample_id != "38", 
-                                                 sample_id != "94", 
-                                                 sample_id != "109")
+                                                 sample_id != "38")
+
 # filter data for 50% in each group: 
-##df_cleaned_50fallgrp <- selectGrps(df_cleaned, metadata_cleaned$tissue, 0.5, n=3)
+df_cleaned_50f <- selectGrps(df_cleaned, metadata_cleaned$tissue, 0.5, n=3)
 
 ####can we merge so we can see exclusive proteins in each region... 
 
@@ -139,7 +169,7 @@ head(poi_indata_long)
 
 ggplot(poi_indata_long, aes(x = tissue, y = intensities)) + 
   geom_violin(trim = FALSE) +  # Set trim to FALSE to display the entire violin plot
-  geom_point(position = position_jitter(width = 0.2), size = 2, alpha = 0.5) +
+  geom_point(position = position_jitter(width = 0.2), size = 1.5, alpha = 0.5) +
   stat_summary(fun = median, geom = "crossbar", width = 0.5, color = "black") +
   labs(x = "Tissue", y = "log2 protein intensities", title = "known_mtj_proteins") +
   theme_minimal() + 
@@ -173,6 +203,8 @@ ggplot(poi_indata_long, aes(x = tissue, y = intensities)) +
   facet_wrap(~ genes, scales = "free")
 
 ```
+
+
 
 #NA filter whole matrix and normalize
 raw data matrix is saved as Rda file. Similarly, data is saved separately after NA filtering.
@@ -541,41 +573,6 @@ ggsave(file = "doc/caro_ex_lcm_spect_1sampleremoved_70f_matrix_qn_MTJ_MDS_bydura
 
 
 
-#Scurve 
-this is a dynamic range plot of ranked protein abundance
-```{r}
-
-df_scurve <- df %>% #use the original df 
-    mutate(genes = ifelse(genes == "", protein_names, genes)) %>%
-    mutate_at(3:110, as.numeric) %>%
-    mutate_all(~ifelse(is.nan(.), NA, .)) %>%
-    mutate(genes = make.names(genes, unique = T), genes) %>% 
-    column_to_rownames(var = "genes") %>% 
-    dplyr::select(-c("protein_names")) %>%
-    log10()
-
-#str(df_scurve)
-
-df_scurve <- df_70f_qn
-df_scurve$median = rowMedians(as.matrix(df_scurve), na.rm = T)
-df_scurve <- df_scurve %>% arrange(desc(median))
-df_scurve$rank = (1:1784)
-
-ggplot(df_scurve, aes(rank, median)) + 
-  geom_line() +
-    labs(title = "S-curve_allsamples") + 
-    ylab("Log10 protein intensities (median)") + 
-    xlab("Abundance rank") + 
-    theme_minimal()
-
-#the 10 most abundant proteins
-row.names(df_scurve[1:10,])
-
-#the 10 least abundant proteins
-row.names(df_scurve[2309:2318,])
-
-#ggsave(file = "doc/caro_ex_lcm_spect_allsamples_scurve.jpeg", width=10, height = 8)
-```
 
 
 ###PCA only in MTJ 
