@@ -58,7 +58,7 @@ names(df) <- sub("^S", "", names(df))
 
 #order df by tissue to make sure sample order in the main data matrix follows the metadata!!
 sample_order <- metadata$sample_id[order(metadata$tissue)]
-sample_order <- trimws(sample_order) 
+sample_order <- trimws(metadata$sample_id) 
 df <- df[ ,sample_order]
 
 usethis::use_data(df, overwrite = T)
@@ -90,7 +90,7 @@ df_muscle <- df_muscle %>%
 names(df_muscle) <- sub("^S", "", names(df_muscle))
 
 #############
-# metadata, sample order 
+# metadata, sample order for only muscle quant
 metadata <- read.csv2("data-raw/MetaData_10Jan.csv", header = T, sep = ';') %>% 
     dplyr::select(1:15) %>%
     mutate_at(1:15, as.factor) %>% 

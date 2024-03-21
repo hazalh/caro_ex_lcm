@@ -353,7 +353,7 @@ principal_component_analysis <-
 
 
 df_50f <- selectOverallPercent(df, 0.5)
-df_nona <- na.omit(df) #705 proteins
+df_nona <- na.omit(df_cleaned) #705 proteins
 df_nona_qn <- normalizeQuantiles(df_nona)
 
 pca_nona <- prcomp(t(df_nona_qn), scale = T)
@@ -394,6 +394,8 @@ ggplot(pca_pc1_pc2, aes(x = PC1 , y = PC2, colour = tissue, label = sample)) +
     ylab(paste("PC2 - ", pca_var_perc[2], "%", sep = "")) + 
     ggtitle("caro_lcm_spect_PCA_noNA_qn") + 
     theme_minimal()
+
+
 ggsave(file = "doc/caro_ex_lcm_spect_1sampleremoved_70f_matrix_qn_nona_PCA_byarea.jpeg")
 
 #####by intervention and area 
