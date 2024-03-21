@@ -389,7 +389,7 @@ pca_pc1_pc2 <- pca_pc1_pc2 %>%
 
 #####by tissue 
 ggplot(pca_pc1_pc2, aes(x = PC1 , y = PC2, colour = tissue, label = sample)) +
-    geom_point(size = 3) +
+    geom_point(size = 2) +
     xlab(paste("PC1 - ", pca_var_perc[1], "%", sep = "")) + 
     ylab(paste("PC2 - ", pca_var_perc[2], "%", sep = "")) + 
     ggtitle("caro_lcm_spect_PCA_noNA_qn") + 
