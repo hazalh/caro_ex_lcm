@@ -1,5 +1,6 @@
 Package: caro_ex_lcm
 Type: Project
+Title: Project_Caro
 Version: 0.0.1
 Imports:
     knitr,
